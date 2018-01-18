@@ -1,34 +1,79 @@
 const express = require('express')
-, app = express()
-, axios = require('axios')
-, port = 4000;
+    , app = express()
+    , axios = require('axios')
+    , port = 4000;
 
 app.set('view engine', 'ejs');
 
-app.get('/', (req, res) => {
-res.render('index')
-})
-
-
 app.get('/character/:name', (req, res) => {
     const { name } = req.params;
-    axios.get('https://swapi.co/api/people/1/').then(response => {
-        res.send(response.data)
-    })
-    //Returns an EJS view (nothing too fancy) with data about the given character. (Needs to work with at least 'luke', 'han', 'leia', and 'rey')
+    axios.get(`https://swapi.co/api/people/?search=${name}`).then(response => {
+        let character = response.data.results[0];
+        res.render('character', {
+            character
+        })
+    }).catch(error => console.log(error));
 })
 
 
 app.get('/characters', (req, res) => {
-    axios.get('https://swapi.co/api/people').then(response => {
-        res.send(response.data.results)
-    })
-    // Returns raw JSON of 50 characters (doesn't matter which 50). This endpoint should be able to take a query parameter in the URL called 'sort'  and the potential sort parameters will be 1 of the following, ['name', 'mass', 'height']  So the endpoint '/characters?sort=height' should return JSON of 50 characters sorted by their height. 
+    const { sort } = req.query 
+    var page = 1;
+    var characterList = []; 
+    (function characters() {
+        axios.get(`https://swapi.co/api/people/?page=${page}`).then(response => {
+            if(page <= 5){
+                characterList = [...characterList, ...response.data.results]
+            page++
+            characters()
+            } else {
+                characterList.sort(function(a, b) {
+                    return a[sort] - b[sort]
+                })
+                res.send(JSON.stringify(characterList))
+            }
+        }).catch(error => console.log(error));
+    })();  
 })
+
+
 
 app.get('/planetresidents', (req, res) => {
     axios.get('https://swapi.co/api/planets').then(response => {
-        res.send(response.data.results)
+        let data = response.data.results
+        let obj = {};  
+
+        // for(var i = 0; i < data.length; i++){
+        //     obj[data[i].name] = data[i].residents
+        // }
+        
+        // for(let key in obj){
+        //     for(let i = 0; i < obj[key].length; i++){
+        //         axios.get(`${obj[key][i]}`).then(response => {  
+        //             obj[key][i] = response.data.name
+        //             console.log(obj)
+        //             res.write(JSON.stringify(obj))
+                    
+        //         })
+        //     }
+        // }
+
+        var counter = 0;
+        
+        for(let i = 0; i < data.length; i++) {
+            let planets = data[i].residents
+            for(let j = 0; j < planets.length; j++){
+                axios.get(`${planets[j]}`).then(response => {  
+                    planets[j] = response.data.name
+                    obj[data[i].name] = data[i].residents
+                    console.log(obj)
+                    if(counter === data.length - 1){
+                        res.send(JSON.stringify(obj))
+                    }
+                    counter++
+                })
+            }
+        }
     })
     //return raw JSON in the form {planetName1: [characterName1, characterName2], planetName2: [characterName3]}   So it is an object where the keys are the planet names, and the values are lists of residents names for that planet
 })
