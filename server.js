@@ -41,39 +41,24 @@ app.get('/characters', (req, res) => {
 app.get('/planetresidents', (req, res) => {
     axios.get('https://swapi.co/api/planets').then(response => {
         let data = response.data.results
-        let obj = {};  
+        let obj = {}; 
 
-        // for(var i = 0; i < data.length; i++){
-        //     obj[data[i].name] = data[i].residents
-        // }
-        
-        // for(let key in obj){
-        //     for(let i = 0; i < obj[key].length; i++){
-        //         axios.get(`${obj[key][i]}`).then(response => {  
-        //             obj[key][i] = response.data.name
-        //             console.log(obj)
-        //             res.write(JSON.stringify(obj))
-                    
-        //         })
-        //     }
-        // }
 
-        var counter = 0;
-        
-        for(let i = 0; i < data.length; i++) {
-            let planets = data[i].residents
-            for(let j = 0; j < planets.length; j++){
-                axios.get(`${planets[j]}`).then(response => {  
-                    planets[j] = response.data.name
-                    obj[data[i].name] = data[i].residents
-                    console.log(obj)
-                    if(counter === data.length - 1){
-                        res.send(JSON.stringify(obj))
-                    }
-                    counter++
+            Promise.all(data.map(planets=> {
+                return Promise.all(planets.residents.map(residents => {
+                     return axios.get(`${residents}`)
+                     .then(resp => {
+                         return resp.data.name
+                     })
+                }))
+            })).then(result => {
+                var obj = {};
+                data.forEach((person, i) =>{
+                        obj[person.name] = result[i];
                 })
-            }
-        }
+                res.send(JSON.stringify(obj))
+            })
+
     })
     //return raw JSON in the form {planetName1: [characterName1, characterName2], planetName2: [characterName3]}   So it is an object where the keys are the planet names, and the values are lists of residents names for that planet
 })
