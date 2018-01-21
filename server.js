@@ -1,18 +1,17 @@
 const express = require('express')
     , app = express()
     , axios = require('axios')
-    , port = 4000;
+    , port = 8081;
 
 app.set('view engine', 'ejs');
 
-app.get('/character/:name', (req, res) => {
-    const { name } = req.params;
-    axios.get(`https://swapi.co/api/people/?search=${name}`).then(response => {
+app.get('/character/:name', async (req, res) => {
+    try {
+        const { name } = req.params;
+        const response = await axios.get(`https://swapi.co/api/people/?search=${name}`)
         let character = response.data.results[0];
-        res.render('character', {
-            character
-        })
-    }).catch(error => console.log(error));
+        res.render('character', { character })
+    } catch(e) { console.log(e) }
 })
 
 
@@ -20,47 +19,39 @@ app.get('/characters', (req, res) => {
     const { sort } = req.query 
     var page = 1;
     var characterList = []; 
-    (function characters() {
-        axios.get(`https://swapi.co/api/people/?page=${page}`).then(response => {
+    (async function characters() {
+        try {
+            const response = await axios.get(`https://swapi.co/api/people/?page=${page}`)
             if(page <= 5){
                 characterList = [...characterList, ...response.data.results]
-            page++
-            characters()
+                page++
+                characters()
             } else {
-                characterList.sort(function(a, b) {
-                    return a[sort] - b[sort]
-                })
+                characterList.sort((a, b) => a[sort] - b[sort])
                 res.send(JSON.stringify(characterList))
             }
-        }).catch(error => console.log(error));
-    })();  
+        } catch(e) { console.log(e) } 
+    })(); 
 })
 
 
-
-app.get('/planetresidents', (req, res) => {
-    axios.get('https://swapi.co/api/planets').then(response => {
+app.get('/planetresidents', async (req, res) => {
+    try {
+        const response = await axios.get('https://swapi.co/api/planets')
         let data = response.data.results
-        let obj = {}; 
-
-
-            Promise.all(data.map(planets=> {
-                return Promise.all(planets.residents.map(residents => {
-                     return axios.get(`${residents}`)
-                     .then(resp => {
-                         return resp.data.name
-                     })
+        var obj = {};
+        (async () => {
+            try {
+                const residents = await Promise.all(data.map(planets=> {
+                    return Promise.all(planets.residents.map(residents => axios.get(`${residents}`)
+                    .then(resp => resp.data.name)
+                    ))
                 }))
-            })).then(result => {
-                var obj = {};
-                data.forEach((person, i) =>{
-                        obj[person.name] = result[i];
-                })
+                data.forEach((planet, i) => obj[planet.name] = residents[i])
                 res.send(JSON.stringify(obj))
-            })
-
-    })
-    //return raw JSON in the form {planetName1: [characterName1, characterName2], planetName2: [characterName3]}   So it is an object where the keys are the planet names, and the values are lists of residents names for that planet
+            } catch(e) { console.log(e) } 
+        })()
+    } catch(e) { console.log(e) } 
 })
 
 
