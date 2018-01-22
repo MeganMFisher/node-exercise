@@ -5,6 +5,7 @@ const express = require('express')
 
 app.set('view engine', 'ejs');
 
+
 app.get('/character/:name', async (req, res) => {
     try {
         const { name } = req.params;
@@ -15,43 +16,27 @@ app.get('/character/:name', async (req, res) => {
 })
 
 
-app.get('/characters', (req, res) => {
+app.get('/characters', async (req, res) => {
     const { sort } = req.query 
-    var page = 1;
     var characterList = []; 
-    (async function characters() {
-        try {
-            const response = await axios.get(`https://swapi.co/api/people/?page=${page}`)
-            if(page <= 5){
-                characterList = [...characterList, ...response.data.results]
-                page++
-                characters()
-            } else {
-                characterList.sort((a, b) => a[sort] - b[sort])
-                res.send(JSON.stringify(characterList))
-            }
-        } catch(e) { console.log(e) } 
-    })(); 
+    var page = 1;
+    while(characterList.length < 50){
+        const response = await axios.get(`https://swapi.co/api/people/?page=${page}`)
+        characterList = [...characterList, ...response.data.results]
+        page++
+    }
+    characterList.sort((a, b) => a[sort] - b[sort])
+    res.send(JSON.stringify(characterList))
 })
 
 
 app.get('/planetresidents', async (req, res) => {
-    try {
-        const response = await axios.get('https://swapi.co/api/planets')
-        let data = response.data.results
-        var obj = {};
-        (async () => {
-            try {
-                const residents = await Promise.all(data.map(planets=> {
-                    return Promise.all(planets.residents.map(residents => axios.get(`${residents}`)
-                    .then(resp => resp.data.name)
-                    ))
-                }))
-                data.forEach((planet, i) => obj[planet.name] = residents[i])
-                res.send(JSON.stringify(obj))
-            } catch(e) { console.log(e) } 
-        })()
-    } catch(e) { console.log(e) } 
+    var obj = {};
+    const response = await axios.get('https://swapi.co/api/planets')
+    let data = response.data.results
+    const residents = await Promise.all(data.map(planets => Promise.all(planets.residents.map(residents => axios.get(`${residents}`).then(res => res.data.name)))))
+    data.forEach((planet, i) => obj[planet.name] = residents[i])
+    res.send(JSON.stringify(obj))
 })
 
 
